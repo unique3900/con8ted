@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
+import { PiMicrophoneLight, PiMicrophoneSlash } from "react-icons/pi";
+import { VscCallOutgoing } from "react-icons/vsc";
 const Caller = () => {
   const { roomcode } = useParams();
   const navigate = useNavigate();
   const roomId = roomcode;
+  let reloaded = false;
   const [callstatus, setCallstatus] = useState(false);
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [muted, setMuted] = useState<boolean>(false);
@@ -15,7 +17,7 @@ const Caller = () => {
   useEffect(() => {
     const socket = new WebSocket("ws://localhost:8080");
     setSocket(socket);
-
+    startCall(socket);
     socket.onopen = () => {
       socket.send(
         JSON.stringify({
@@ -34,7 +36,7 @@ const Caller = () => {
     return () => {
       socket.close();
     };
-  }, [roomId]);
+  }, [roomId, callstatus]);
 
   const startCall = async (socket: WebSocket) => {
     const pc = new RTCPeerConnection();
@@ -43,6 +45,7 @@ const Caller = () => {
 
     socket.onmessage = async (event) => {
       const message = JSON.parse(event.data);
+      console.log(message.type);
       switch (message.type) {
         case "create-answer":
           await pc.setRemoteDescription(new RTCSessionDescription(message.sdp));
@@ -80,15 +83,14 @@ const Caller = () => {
       }
     };
 
-    pc.ontrack = (event) => {
+    pc.ontrack = async (event) => {
       const [stream] = event.streams;
       setRemoteStream(stream);
-
-      const remoteVideo = document.getElementById("remoteVideo") as HTMLVideoElement;
-      if (remoteVideo) {
-        remoteVideo.srcObject = stream;
-        remoteVideo.play().catch(console.error);
-      }
+      const remoteVideo = (await document.getElementById(
+        "remoteVideo"
+      )) as HTMLVideoElement;
+      remoteVideo.srcObject = stream;
+      await remoteVideo.play().catch(console.error);
     };
 
     try {
@@ -104,11 +106,13 @@ const Caller = () => {
       video: true,
       audio: true,
     });
-    const localVideo = document.getElementById("localVideo") as HTMLVideoElement;
-    if (localVideo) {
-      localVideo.srcObject = stream;
-      localVideo.play().catch(console.error);
-    }
+    const localVideo = document.getElementById(
+      "localVideo"
+    ) as HTMLVideoElement;
+    localVideo.srcObject = stream;
+
+    localVideo.play().catch(console.error);
+
     stream.getTracks().forEach((track) => {
       pc.addTrack(track, stream);
     });
@@ -118,7 +122,9 @@ const Caller = () => {
 
   const muteCall = () => {
     if (localStream) {
-      localStream.getAudioTracks().forEach((track) => (track.enabled = !track.enabled));
+      localStream
+        .getAudioTracks()
+        .forEach((track) => (track.enabled = !track.enabled));
       setMuted(!muted);
     }
   };
@@ -142,8 +148,12 @@ const Caller = () => {
       setRemoteStream(null);
     }
 
-    const localVideo = document.getElementById("localVideo") as HTMLVideoElement;
-    const remoteVideo = document.getElementById("remoteVideo") as HTMLVideoElement;
+    const localVideo = document.getElementById(
+      "localVideo"
+    ) as HTMLVideoElement;
+    const remoteVideo = document.getElementById(
+      "remoteVideo"
+    ) as HTMLVideoElement;
     if (localVideo) {
       localVideo.srcObject = null;
     }
@@ -152,6 +162,7 @@ const Caller = () => {
     }
 
     navigate("/");
+    window.location.reload();
   };
 
   return (
@@ -162,25 +173,32 @@ const Caller = () => {
           id="localVideo"
           autoPlay
           muted={muted}
+          width={600}
+          height={600}
           className="relative z-10"
         ></video>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={muteCall}
-            className="bg-green-700 p-5 text-white rounded-full z-10"
-          >
-            Mute
-          </button>
-          <button
-            onClick={endCall}
-            className="bg-red-700 p-5 text-white rounded-full z-10"
-          >
-            End
-          </button>
-        </div>
       </div>
 
-      <video id="remoteVideo" className="z-20" autoPlay controls></video>
+      <video id="remoteVideo" className="z-20" width={600} height={600}></video>
+
+      <div className="absolute bottom-36 flex items-center gap-4">
+        <button
+          onClick={muteCall}
+          className="bg-green-700 p-5  text-white rounded-full z-10"
+        >
+          {muted ? (
+            <PiMicrophoneSlash size={22} />
+          ) : (
+            <PiMicrophoneLight size={22} />
+          )}
+        </button>
+        <button
+          onClick={endCall}
+          className="bg-red-700 p-5  text-white rounded-full z-10"
+        >
+          <VscCallOutgoing size={22} />
+        </button>
+      </div>
     </div>
   );
 };

@@ -6,9 +6,10 @@ import Joined from "./lib/Joined.tsx";
 import { BrowserRouter } from "react-router-dom";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <BrowserRouter>
-    <Joined>
-      <App />
-    </Joined>
-  </BrowserRouter>
+
+    <BrowserRouter>
+      <Joined>
+        <App />
+      </Joined>
+    </BrowserRouter>
 );
