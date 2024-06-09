@@ -3571,8 +3571,10 @@ var handleMessage = (socket, message, roomId) => {
   const room = rooms[roomId];
   let target = null;
   if (type === "create-offer" || type === "ice-candidate" && socket == room.sender) {
+    console.log("Offer Created");
     target = room.receiver;
   } else if (type === "create-answer" || type === "ice-candidate" && socket == room.receiver) {
+    console.log("Answer Given");
     target = room.sender;
   }
   if (target) {

@@ -3,22 +3,19 @@ import { useNavigate, useParams } from "react-router-dom";
 
 const Caller = () => {
   const { roomcode } = useParams();
-  const navigate=useNavigate();
+  const navigate = useNavigate();
   const roomId = roomcode;
-  const [callstatus,setCallstatus]=useState(false);
+  const [callstatus, setCallstatus] = useState(false);
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [muted, setMuted] = useState<boolean>(false);
   const [connection, setConnection] = useState<RTCPeerConnection | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
-
-
   useEffect(() => {
     const socket = new WebSocket("ws://localhost:8080");
     setSocket(socket);
-    
-    startCall();
+
     socket.onopen = () => {
       socket.send(
         JSON.stringify({
@@ -32,22 +29,17 @@ const Caller = () => {
       console.log("Something went wrong in sender side", err);
     };
 
+    startCall(socket);
+
     return () => {
       socket.close();
     };
-  }, [roomId,callstatus]);
+  }, [roomId]);
 
-  
-
-  const startCall = async () => {
+  const startCall = async (socket: WebSocket) => {
     const pc = new RTCPeerConnection();
     setConnection(pc);
-    setCallstatus(true)
-
-    if (!socket) {
-
-      return;
-    }
+    setCallstatus(true);
 
     socket.onmessage = async (event) => {
       const message = JSON.parse(event.data);
@@ -76,7 +68,7 @@ const Caller = () => {
       );
     };
 
-    pc.onicecandidate = async (event) => {
+    pc.onicecandidate = (event) => {
       if (event.candidate) {
         socket.send(
           JSON.stringify({
@@ -88,14 +80,17 @@ const Caller = () => {
       }
     };
 
-    pc.ontrack = async (event) => {
-      const [stream] = await event.streams;
+    pc.ontrack = (event) => {
+      const [stream] = event.streams;
       setRemoteStream(stream);
-      const remoteVideo = document.createElement("video");
-      document.body.appendChild(remoteVideo);
-      remoteVideo.srcObject = stream;
-      remoteVideo.play();
+
+      const remoteVideo = document.getElementById("remoteVideo") as HTMLVideoElement;
+      if (remoteVideo) {
+        remoteVideo.srcObject = stream;
+        remoteVideo.play().catch(console.error);
+      }
     };
+
     try {
       const stream = await accessMediaStream(pc);
       setLocalStream(stream);
@@ -109,11 +104,10 @@ const Caller = () => {
       video: true,
       audio: true,
     });
-    const localVideo = document.getElementById(
-      "localVideo"
-    ) as HTMLVideoElement;
+    const localVideo = document.getElementById("localVideo") as HTMLVideoElement;
     if (localVideo) {
       localVideo.srcObject = stream;
+      localVideo.play().catch(console.error);
     }
     stream.getTracks().forEach((track) => {
       pc.addTrack(track, stream);
@@ -123,16 +117,17 @@ const Caller = () => {
   };
 
   const muteCall = () => {
-    setMuted(!muted);
+    if (localStream) {
+      localStream.getAudioTracks().forEach((track) => (track.enabled = !track.enabled));
+      setMuted(!muted);
+    }
   };
 
-  const endCall =async () => {
-    setCallstatus(false)
-    
-     localStream?.getTracks().forEach(async function(track) {
-       await track.stop();
-      });
-    
+  const endCall = async () => {
+    setCallstatus(false);
+
+    localStream?.getTracks().forEach((track) => track.stop());
+
     if (connection) {
       connection.close();
       setConnection(null);
@@ -142,26 +137,23 @@ const Caller = () => {
       setSocket(null);
     }
 
-
     if (remoteStream) {
       remoteStream.getTracks().forEach((track) => track.stop());
       setRemoteStream(null);
     }
-    const localVideo = document.getElementById(
-      "localVideo"
-    ) as HTMLVideoElement;
-    const remoteVideo = document.getElementById(
-      "remoteVideo"
-    ) as HTMLVideoElement;
+
+    const localVideo = document.getElementById("localVideo") as HTMLVideoElement;
+    const remoteVideo = document.getElementById("remoteVideo") as HTMLVideoElement;
     if (localVideo) {
       localVideo.srcObject = null;
     }
     if (remoteVideo) {
       remoteVideo.srcObject = null;
     }
-    navigate('/')
-    
+
+    navigate("/");
   };
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-theme-blue to-indigo-600/80 flex flex-row gap-10 items-center justify-center px-10">
       <div className="absolute top-0 left-0 w-full h-full bg-black/60 z-10"></div>
@@ -175,20 +167,20 @@ const Caller = () => {
         <div className="flex items-center gap-4">
           <button
             onClick={muteCall}
-            className="bg-green-700 p-5  text-white rounded-full z-10"
+            className="bg-green-700 p-5 text-white rounded-full z-10"
           >
             Mute
           </button>
           <button
             onClick={endCall}
-            className="bg-red-700 p-5  text-white rounded-full z-10"
+            className="bg-red-700 p-5 text-white rounded-full z-10"
           >
             End
           </button>
         </div>
       </div>
 
-      <video id="remoteVideo" autoPlay controls></video>
+      <video id="remoteVideo" className="z-20" autoPlay controls></video>
     </div>
   );
 };

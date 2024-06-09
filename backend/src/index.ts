@@ -71,9 +71,11 @@ const handleMessage=(socket:WebSocket,message:any,roomId:string)=>{
     let target:WebSocket |null=null;
 
     if(type==="create-offer" || type === "ice-candidate" && socket==room.sender){
+        console.log("Offer Created")
         target=room.receiver;
     }
     else if(type === "create-answer" || type ==="ice-candidate" && socket== room.receiver){
+        console.log("Answer Given")
         target=room.sender;
     }
 
